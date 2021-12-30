@@ -161,6 +161,10 @@ impl Generator {
                 .instruction_cycle_func(Box::new(instruction_cycles));
             let default_machine = machine_builder.build();
 
+            if aot_code_opt.is_none() {
+                log::warn!("Not AOT mode!");
+            }
+
             #[cfg(has_asm)]
             let mut machine = ckb_vm::machine::asm::AsmMachine::new(default_machine, aot_code_opt);
 
