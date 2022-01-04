@@ -2,9 +2,10 @@ use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use gw_config::SubscribeMemPoolConfig;
+use gw_runtime::{block_on, spawn};
 use gw_types::packed::*;
 use gw_types::prelude::Unpack;
-use smol::lock::Mutex;
+use tokio::sync::Mutex;
 
 use crate::pool::MemPool;
 
@@ -28,7 +29,7 @@ impl SubscribeMemPoolService {
             hex::encode(&tx_hash),
             block_number
         );
-        smol::block_on(async {
+        block_on(async {
             let mut mem_pool = self.mem_pool.lock().await;
             if let Err(err) = mem_pool.append_tx(tx, block_number).await {
                 log::error!("Sync tx from full node failed: {:?}", err);
@@ -46,7 +47,7 @@ impl SubscribeMemPoolService {
         let withdrawals = next_mem_block.withdrawals().into_iter().collect();
         let deposits = next_mem_block.deposits().unpack();
 
-        smol::block_on(async {
+        block_on(async {
             let mut mem_pool = self.mem_pool.lock().await;
             mem_pool
                 .refresh_mem_block(block_info, withdrawals, deposits)
@@ -66,16 +67,15 @@ pub fn spawn_sub_mem_pool_task(
         group,
     } = mem_block_config;
     let mut consumer = gw_kafka::Consumer::start(hosts, topic, group, fan_in)?;
-    smol::spawn(async move {
+    spawn(async move {
         log::info!("Spawn fan in mem_block task");
         loop {
-            let _ = smol::Timer::after(Duration::from_secs(5)).await;
+            let _ = tokio::time::sleep(Duration::from_secs(5)).await;
             if let Err(err) = consumer.poll() {
                 log::error!("consume error: {:?}", err);
             }
         }
-    })
-    .detach();
+    });
 
     Ok(())
 }
