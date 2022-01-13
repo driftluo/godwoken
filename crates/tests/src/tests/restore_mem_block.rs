@@ -18,7 +18,7 @@ use gw_rpc_client::ckb_client::CKBClient;
 use gw_rpc_client::indexer_client::CKBIndexerClient;
 use gw_rpc_client::rpc_client::RPCClient;
 use gw_rpc_server::registry::{Registry, RegistryArgs};
-use gw_runtime::block_on;
+use gw_runtime::{block_on, spawn_blocking};
 use gw_store::state::state_db::StateContext;
 use gw_types::core::ScriptHashType;
 use gw_types::offchain::{CellInfo, CollectedCustodianCells, DepositInfo, RollupContext};
@@ -231,6 +231,9 @@ fn test_restore_mem_block() {
 
         Registry::new(args)
     };
+
+    // Sleep a while, let registry re-inject txs (fix test for tokio runtime)
+    spawn_blocking(|| block_on(async { tokio::time::sleep(Duration::from_secs(10)).await }));
 
     // Check restore withdrawals, deposits and txs
     {
